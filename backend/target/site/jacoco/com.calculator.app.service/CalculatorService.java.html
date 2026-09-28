@@ -1,0 +1,322 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CalculatorService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">calculator-app</a> &gt; <a href="index.source.html" class="el_package">com.calculator.app.service</a> &gt; <span class="el_source">CalculatorService.java</span></div><h1>CalculatorService.java</h1><pre class="source lang-java linenums">package com.calculator.app.service;
+
+import com.calculator.app.dto.request.AddRequest;
+import com.calculator.app.dto.request.CalcOperationRequest;
+import com.calculator.app.dto.request.DivideRequest;
+import com.calculator.app.dto.request.ExpressionRequest;
+import com.calculator.app.dto.request.MultiplyRequest;
+import com.calculator.app.dto.request.PercentageRequest;
+import com.calculator.app.dto.request.PowerRequest;
+import com.calculator.app.dto.request.SqrtRequest;
+import com.calculator.app.dto.request.SubtractRequest;
+import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+import java.math.MathContext;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.List;
+
+@Service
+<span class="fc" id="L22">public class CalculatorService {</span>
+
+<span class="fc" id="L24">    private static final MathContext MC = MathContext.DECIMAL128;</span>
+
+<span class="fc" id="L26">    private enum TokenType { NUMBER, OPERATOR, LEFT_PAREN, RIGHT_PAREN }</span>
+
+<span class="fc" id="L28">    private record Token(TokenType type, String value) {}</span>
+
+    public String evaluate(CalcOperationRequest request) {
+        BigDecimal result;
+        // A sealed exhaustive switch is the preferred Java 21 upgrade path.
+<span class="fc bfc" id="L33" title="All 2 branches covered.">        if (request instanceof AddRequest r) {</span>
+<span class="fc" id="L34">            result = parse(r.operandA()).add(parse(r.operandB()), MC);</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">        } else if (request instanceof SubtractRequest r) {</span>
+<span class="fc" id="L36">            result = parse(r.operandA()).subtract(parse(r.operandB()), MC);</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        } else if (request instanceof MultiplyRequest r) {</span>
+<span class="fc" id="L38">            result = parse(r.operandA()).multiply(parse(r.operandB()), MC);</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        } else if (request instanceof DivideRequest r) {</span>
+<span class="fc" id="L40">            BigDecimal b = parse(r.operandB());</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">            if (b.compareTo(BigDecimal.ZERO) == 0) {</span>
+<span class="fc" id="L42">                throw new IllegalArgumentException(&quot;cannot divide by zero&quot;);</span>
+            }
+<span class="fc" id="L44">            result = parse(r.operandA()).divide(b, MC);</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        } else if (request instanceof PowerRequest r) {</span>
+<span class="fc" id="L46">            result = calculatePower(parse(r.operandA()), parse(r.operandB()));</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        } else if (request instanceof SqrtRequest r) {</span>
+<span class="fc" id="L48">            BigDecimal a = parse(r.operandA());</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">            if (a.compareTo(BigDecimal.ZERO) &lt; 0) {</span>
+<span class="fc" id="L50">                throw new IllegalArgumentException(&quot;Not a Real Number&quot;);</span>
+            }
+<span class="fc" id="L52">            result = a.sqrt(MC);</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        } else if (request instanceof PercentageRequest r) {</span>
+<span class="fc" id="L54">            result = parse(r.operandA()).divide(BigDecimal.valueOf(100), MC);</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">        } else if (request instanceof ExpressionRequest r) {</span>
+<span class="fc" id="L56">            return evaluateShuntingYard(r.expression());</span>
+        } else {
+<span class="nc" id="L58">            throw new IllegalStateException(&quot;Unsupported request type: &quot; + request.getClass());</span>
+        }
+        
+<span class="fc" id="L61">        checkRange(result);</span>
+<span class="fc" id="L62">        return format(result);</span>
+    }
+
+    private BigDecimal parse(String val) {
+<span class="fc" id="L66">        return new BigDecimal(val);</span>
+    }
+
+    private String format(BigDecimal val) {
+<span class="fc" id="L70">        return val.stripTrailingZeros().toPlainString();</span>
+    }
+
+    private void checkRange(BigDecimal value) {
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        if (value.compareTo(BigDecimal.ZERO) != 0) {</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">            if (Math.abs(value.precision() - value.scale() - 1) &gt; 100) {</span>
+<span class="fc" id="L76">                throw new IllegalArgumentException(&quot;Result out of supported range&quot;);</span>
+            }
+        }
+<span class="fc" id="L79">    }</span>
+
+    private BigDecimal calculatePower(BigDecimal base, BigDecimal exponent) {
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        if (exponent.remainder(BigDecimal.ONE).signum() == 0) {</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">            if (exponent.abs().compareTo(BigDecimal.valueOf(1000)) &gt; 0) {</span>
+<span class="fc" id="L84">                throw new IllegalArgumentException(&quot;Exponent must be between -1000 and 1000&quot;);</span>
+            }
+<span class="fc" id="L86">            int exp = exponent.intValueExact();</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">            if (exp &lt; 0) {</span>
+<span class="fc" id="L88">                BigDecimal pow = base.pow(-exp, MC);</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">                if (pow.compareTo(BigDecimal.ZERO) == 0) {</span>
+<span class="fc" id="L90">                    throw new IllegalArgumentException(&quot;cannot divide by zero&quot;);</span>
+                }
+<span class="fc" id="L92">                return BigDecimal.ONE.divide(pow, MC);</span>
+            }
+<span class="fc" id="L94">            return base.pow(exp, MC);</span>
+        } else {
+<span class="nc" id="L96">            double fres = Math.pow(base.doubleValue(), exponent.doubleValue());</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">            if (Double.isNaN(fres)) {</span>
+<span class="nc" id="L98">                throw new IllegalArgumentException(&quot;Not a Real Number&quot;);</span>
+            }
+<span class="nc bnc" id="L100" title="All 2 branches missed.">            if (Double.isInfinite(fres)) {</span>
+<span class="nc" id="L101">                throw new IllegalArgumentException(&quot;Result is Infinity&quot;);</span>
+            }
+<span class="nc" id="L103">            return BigDecimal.valueOf(fres);</span>
+        }
+    }
+
+    private String evaluateShuntingYard(String expr) {
+<span class="pc bpc" id="L108" title="1 of 4 branches missed.">        if (expr == null || expr.trim().isEmpty()) {</span>
+<span class="fc" id="L109">            throw new IllegalArgumentException(&quot;Missing expression&quot;);</span>
+        }
+        
+<span class="fc" id="L112">        List&lt;Token&gt; tokens = tokenize(expr);</span>
+<span class="fc" id="L113">        List&lt;Token&gt; rpn = toRPN(tokens);</span>
+<span class="fc" id="L114">        return evaluateRPN(rpn);</span>
+    }
+
+    private List&lt;Token&gt; tokenize(String expr) {
+<span class="fc" id="L118">        List&lt;Token&gt; tokens = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L119">        int i = 0;</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        while (i &lt; expr.length()) {</span>
+<span class="fc" id="L121">            char ch = expr.charAt(i);</span>
+
+<span class="fc bfc" id="L123" title="All 2 branches covered.">            if (Character.isWhitespace(ch)) {</span>
+<span class="fc" id="L124">                i++;</span>
+<span class="fc" id="L125">                continue;</span>
+            }
+
+<span class="pc bpc" id="L128" title="1 of 4 branches missed.">            if (Character.isDigit(ch) || ch == '.') {</span>
+<span class="fc" id="L129">                int start = i;</span>
+<span class="fc" id="L130">                boolean hasDot = false;</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">                while (i &lt; expr.length()) {</span>
+<span class="fc" id="L132">                    char c = expr.charAt(i);</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">                    if (Character.isDigit(c)) {</span>
+<span class="fc" id="L134">                        i++;</span>
+<span class="pc bpc" id="L135" title="1 of 4 branches missed.">                    } else if (c == '.' &amp;&amp; !hasDot) {</span>
+<span class="fc" id="L136">                        hasDot = true;</span>
+<span class="fc" id="L137">                        i++;</span>
+                    } else {
+                        break;
+                    }
+<span class="fc" id="L141">                }</span>
+<span class="fc" id="L142">                tokens.add(new Token(TokenType.NUMBER, expr.substring(start, i)));</span>
+<span class="fc" id="L143">                continue;</span>
+            }
+
+<span class="fc bfc" id="L146" title="All 2 branches covered.">            if (ch == '(') {</span>
+<span class="fc" id="L147">                tokens.add(new Token(TokenType.LEFT_PAREN, &quot;(&quot;));</span>
+<span class="fc" id="L148">                i++;</span>
+<span class="fc" id="L149">                continue;</span>
+            }
+<span class="fc bfc" id="L151" title="All 2 branches covered.">            if (ch == ')') {</span>
+<span class="fc" id="L152">                tokens.add(new Token(TokenType.RIGHT_PAREN, &quot;)&quot;));</span>
+<span class="fc" id="L153">                i++;</span>
+<span class="fc" id="L154">                continue;</span>
+            }
+
+<span class="fc bfc" id="L157" title="All 12 branches covered.">            if (ch == '+' || ch == '-' || ch == '*' || ch == '/' || ch == '^' || ch == '√') {</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">                if (ch == '-') {</span>
+<span class="fc" id="L159">                    boolean isUnary = false;</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">                    if (tokens.isEmpty()) {</span>
+<span class="fc" id="L161">                        isUnary = true;</span>
+                    } else {
+<span class="fc" id="L163">                        Token prev = tokens.get(tokens.size() - 1);</span>
+<span class="pc bpc" id="L164" title="3 of 4 branches missed.">                        if (prev.type() == TokenType.OPERATOR || prev.type() == TokenType.LEFT_PAREN) {</span>
+<span class="fc" id="L165">                            isUnary = true;</span>
+                        }
+                    }
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">                    if (isUnary) {</span>
+<span class="fc" id="L169">                        tokens.add(new Token(TokenType.OPERATOR, &quot;u-&quot;));</span>
+<span class="fc" id="L170">                        i++;</span>
+<span class="fc" id="L171">                        continue;</span>
+                    }
+                }
+<span class="fc" id="L174">                tokens.add(new Token(TokenType.OPERATOR, String.valueOf(ch)));</span>
+<span class="fc" id="L175">                i++;</span>
+<span class="fc" id="L176">                continue;</span>
+            }
+
+<span class="fc" id="L179">            throw new IllegalArgumentException(&quot;Invalid character: &quot; + ch);</span>
+        }
+
+<span class="fc" id="L182">        return tokens;</span>
+    }
+
+    private int getPrecedence(String op) {
+<span class="pc bpc" id="L186" title="1 of 6 branches missed.">        switch (op) {</span>
+<span class="fc" id="L187">            case &quot;+&quot;: case &quot;-&quot;: return 1;</span>
+<span class="fc" id="L188">            case &quot;*&quot;: case &quot;/&quot;: return 2;</span>
+<span class="fc" id="L189">            case &quot;u-&quot;: return 3;</span>
+<span class="fc" id="L190">            case &quot;^&quot;: return 4;</span>
+<span class="fc" id="L191">            case &quot;√&quot;: return 5;</span>
+<span class="nc" id="L192">            default: return 0;</span>
+        }
+    }
+
+    private boolean isLeftAssociative(String op) {
+<span class="pc bpc" id="L197" title="4 of 8 branches missed.">        return op.equals(&quot;+&quot;) || op.equals(&quot;-&quot;) || op.equals(&quot;*&quot;) || op.equals(&quot;/&quot;);</span>
+    }
+
+    private boolean isPrefix(String op) {
+<span class="fc bfc" id="L201" title="All 4 branches covered.">        return op.equals(&quot;u-&quot;) || op.equals(&quot;√&quot;);</span>
+    }
+
+    private List&lt;Token&gt; toRPN(List&lt;Token&gt; tokens) {
+<span class="fc" id="L205">        List&lt;Token&gt; output = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L206">        Deque&lt;Token&gt; ops = new ArrayDeque&lt;&gt;();</span>
+
+<span class="fc bfc" id="L208" title="All 2 branches covered.">        for (Token t : tokens) {</span>
+<span class="pc bpc" id="L209" title="1 of 5 branches missed.">            switch (t.type()) {</span>
+                case NUMBER:
+<span class="fc" id="L211">                    output.add(t);</span>
+<span class="fc" id="L212">                    break;</span>
+                case LEFT_PAREN:
+<span class="fc" id="L214">                    ops.push(t);</span>
+<span class="fc" id="L215">                    break;</span>
+                case RIGHT_PAREN:
+<span class="fc" id="L217">                    boolean found = false;</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">                    while (!ops.isEmpty()) {</span>
+<span class="fc" id="L219">                        Token top = ops.pop();</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">                        if (top.type() == TokenType.LEFT_PAREN) {</span>
+<span class="fc" id="L221">                            found = true;</span>
+<span class="fc" id="L222">                            break;</span>
+                        }
+<span class="fc" id="L224">                        output.add(top);</span>
+<span class="fc" id="L225">                    }</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">                    if (!found) throw new IllegalArgumentException(&quot;Mismatched parentheses&quot;);</span>
+                    break;
+                case OPERATOR:
+<span class="fc bfc" id="L229" title="All 2 branches covered.">                    if (isPrefix(t.value())) {</span>
+<span class="fc" id="L230">                        ops.push(t);</span>
+                    } else {
+<span class="fc bfc" id="L232" title="All 2 branches covered.">                        while (!ops.isEmpty()) {</span>
+<span class="fc" id="L233">                            Token top = ops.peek();</span>
+<span class="fc bfc" id="L234" title="All 2 branches covered.">                            if (top.type() == TokenType.LEFT_PAREN) break;</span>
+                            
+<span class="fc" id="L236">                            int precedenceTop = getPrecedence(top.value());</span>
+<span class="fc" id="L237">                            int precedenceT = getPrecedence(t.value());</span>
+                            
+<span class="pc bpc" id="L239" title="1 of 6 branches missed.">                            if (precedenceTop &gt; precedenceT || (precedenceTop == precedenceT &amp;&amp; isLeftAssociative(t.value()))) {</span>
+<span class="fc" id="L240">                                output.add(ops.pop());</span>
+                            } else {
+                                break;
+                            }
+<span class="fc" id="L244">                        }</span>
+<span class="fc" id="L245">                        ops.push(t);</span>
+                    }
+                    break;
+            }
+<span class="fc" id="L249">        }</span>
+
+<span class="fc bfc" id="L251" title="All 2 branches covered.">        while (!ops.isEmpty()) {</span>
+<span class="fc" id="L252">            Token top = ops.pop();</span>
+<span class="fc bfc" id="L253" title="All 2 branches covered.">            if (top.type() == TokenType.LEFT_PAREN) throw new IllegalArgumentException(&quot;Mismatched parentheses&quot;);</span>
+<span class="fc" id="L254">            output.add(top);</span>
+<span class="fc" id="L255">        }</span>
+
+<span class="fc" id="L257">        return output;</span>
+    }
+
+    private String evaluateRPN(List&lt;Token&gt; rpn) {
+<span class="fc" id="L261">        Deque&lt;BigDecimal&gt; stack = new ArrayDeque&lt;&gt;();</span>
+
+<span class="fc bfc" id="L263" title="All 2 branches covered.">        for (Token t : rpn) {</span>
+<span class="fc bfc" id="L264" title="All 2 branches covered.">            if (t.type() == TokenType.NUMBER) {</span>
+                try {
+<span class="fc" id="L266">                    stack.push(parse(t.value()));</span>
+<span class="nc" id="L267">                } catch (NumberFormatException e) {</span>
+<span class="nc" id="L268">                    throw new IllegalArgumentException(&quot;Invalid number format&quot;);</span>
+<span class="fc" id="L269">                }</span>
+<span class="pc bpc" id="L270" title="1 of 2 branches missed.">            } else if (t.type() == TokenType.OPERATOR) {</span>
+                BigDecimal result;
+<span class="fc bfc" id="L272" title="All 2 branches covered.">                if (t.value().equals(&quot;u-&quot;)) {</span>
+<span class="pc bpc" id="L273" title="1 of 2 branches missed.">                    if (stack.isEmpty()) throw new IllegalArgumentException(&quot;Invalid expression&quot;);</span>
+<span class="fc" id="L274">                    result = stack.pop().negate();</span>
+<span class="fc bfc" id="L275" title="All 2 branches covered.">                } else if (t.value().equals(&quot;√&quot;)) {</span>
+<span class="pc bpc" id="L276" title="1 of 2 branches missed.">                    if (stack.isEmpty()) throw new IllegalArgumentException(&quot;Invalid expression&quot;);</span>
+<span class="fc" id="L277">                    BigDecimal a = stack.pop();</span>
+<span class="pc bpc" id="L278" title="1 of 2 branches missed.">                    if (a.compareTo(BigDecimal.ZERO) &lt; 0) {</span>
+<span class="nc" id="L279">                        throw new IllegalArgumentException(&quot;Not a Real Number&quot;);</span>
+                    }
+<span class="fc" id="L281">                    result = a.sqrt(MC);</span>
+<span class="fc" id="L282">                } else {</span>
+<span class="pc bpc" id="L283" title="1 of 2 branches missed.">                    if (stack.size() &lt; 2) throw new IllegalArgumentException(&quot;Invalid expression&quot;);</span>
+<span class="fc" id="L284">                    BigDecimal b = stack.pop();</span>
+<span class="fc" id="L285">                    BigDecimal a = stack.pop();</span>
+                    
+<span class="pc bpc" id="L287" title="2 of 6 branches missed.">                    switch (t.value()) {</span>
+                        case &quot;+&quot;:
+<span class="fc" id="L289">                            result = a.add(b, MC);</span>
+<span class="fc" id="L290">                            break;</span>
+                        case &quot;-&quot;:
+<span class="nc" id="L292">                            result = a.subtract(b, MC);</span>
+<span class="nc" id="L293">                            break;</span>
+                        case &quot;*&quot;:
+<span class="fc" id="L295">                            result = a.multiply(b, MC);</span>
+<span class="fc" id="L296">                            break;</span>
+                        case &quot;/&quot;:
+<span class="fc bfc" id="L298" title="All 2 branches covered.">                            if (b.compareTo(BigDecimal.ZERO) == 0) {</span>
+<span class="fc" id="L299">                                throw new IllegalArgumentException(&quot;cannot divide by zero&quot;);</span>
+                            }
+<span class="fc" id="L301">                            result = a.divide(b, MC);</span>
+<span class="fc" id="L302">                            break;</span>
+                        case &quot;^&quot;:
+<span class="fc" id="L304">                            result = calculatePower(a, b);</span>
+<span class="fc" id="L305">                            break;</span>
+                        default:
+<span class="nc" id="L307">                            throw new IllegalArgumentException(&quot;Unsupported operator&quot;);</span>
+                    }
+                }
+<span class="fc" id="L310">                checkRange(result);</span>
+<span class="fc" id="L311">                stack.push(result);</span>
+            }
+<span class="fc" id="L313">        }</span>
+
+<span class="fc bfc" id="L315" title="All 2 branches covered.">        if (stack.size() != 1) {</span>
+<span class="fc" id="L316">            throw new IllegalArgumentException(&quot;Invalid expression&quot;);</span>
+        }
+
+<span class="fc" id="L319">        return format(stack.pop());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

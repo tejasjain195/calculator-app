@@ -1,14 +1,14 @@
-# Build stage
-FROM golang:1.21-alpine AS builder
+# Build Stage
+FROM maven:3.9.6-eclipse-temurin-17-alpine AS build
 WORKDIR /app
-COPY go.mod go.sum ./
-RUN go mod download
-COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -o main ./cmd/api/main.go
+COPY pom.xml .
+RUN mvn dependency:go-offline -B
+COPY src ./src
+RUN mvn package -DskipTests
 
-# Run stage
-FROM scratch
+# Run Stage
+FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
-COPY --from=builder /app/main .
+COPY --from=build /app/target/calculator-app-0.0.1-SNAPSHOT.jar app.jar
 EXPOSE 8080
-ENTRYPOINT ["./main"]
+ENTRYPOINT ["java", "-jar", "app.jar"]
