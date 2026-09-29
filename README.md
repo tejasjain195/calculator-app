@@ -9,7 +9,7 @@ Note: the backend is Java/Spring Boot rather than the preferred Go - see 'Why Ja
 
 1. Clone the repository:
 ```bash
-git clone git@github.com:tejasjain195/calculator-app.git
+git clone https://github.com/tejasjain195/calculator-app.git
 cd calculator-app
 ```
 
