@@ -4,6 +4,11 @@ dist/
 dist-ssr/
 *.local
 
+# Java
+target/
+!backend/.mvn/wrapper/maven-wrapper.properties
+!backend/.mvn/wrapper/maven-wrapper.jar
+
 # Go
 backend/main
 backend/bin/

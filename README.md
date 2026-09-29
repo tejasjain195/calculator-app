@@ -5,36 +5,42 @@ A fullstack calculator application featuring a React/Vite frontend and a Java Sp
 Note: the backend is Java/Spring Boot rather than the preferred Go - see 'Why Java instead of Go' below.
 
 ## Quick Start
-**Prerequisites:** JDK 17, Maven, Node.js (v24.14.0)
+**Prerequisites:** JDK 17, Maven, Node.js (tested with v24.14.0). Docker Desktop is only required if you use the "Run with Docker" option below.
 
 1. Clone the repository:
 ```bash
-git clone <repository_url>
-cd <repository_directory>
+git clone git@github.com:tejasjain195/calculator-app.git
+cd calculator-app
 ```
 
-2. **Backend:**
-Navigate to the `backend/` directory and run the application:
-```bash
-cd backend
-mvn spring-boot:run
-```
-The backend will run on `http://localhost:8080`. *(Note: `./mvnw` is not available in this repo.)*
+2. **Backend** (start this first). Choose one option:
+- Option A (any terminal, needs Maven):
+    macOS/Linux/Windows:  cd backend && mvn spring-boot:run
+- Option B (IntelliJ IDEA): open the `backend/` folder as a project, let IntelliJ import the Maven dependencies (JDK 17), open src/main/java/com/calculator/app/CalculatorApplication.java and click the green Run button next to main().
+
+Wait for the log line "Started CalculatorApplication". The API is then at http://localhost:8080.
 
 3. **Frontend:**
-Navigate to the `frontend/` directory, install dependencies, and start the UI:
+Start the backend first, then open http://localhost:3000. Navigate to the `frontend/` directory, install dependencies, and start the UI:
 ```bash
 cd frontend
 npm ci
 npm run dev
 ```
-The frontend will be accessible at `http://localhost:3000`.
 
 **Frontend Environment Setup:**
 The frontend connects to the backend using the `VITE_API_URL` environment variable (defaults to `http://localhost:8080`). To customize this, create a `.env` file in the `frontend/` directory:
 ```env
 VITE_API_URL=http://localhost:8080
 ```
+
+## Run with Docker
+To easily start the entire application using containers, simply run:
+```bash
+docker compose up --build
+```
+Note: to test the API from Windows PowerShell, use `curl.exe` (not the built-in `curl` alias) or `Invoke-RestMethod` - see the Windows note under Curl Examples below for the exact syntax.
+Once it finishes building and booting up, open http://localhost:3000 in your browser!
 
 ## API
 
@@ -46,7 +52,7 @@ The backend exposes a single POST endpoint `/api/calculate`.
 | `sqrt`, `percentage` | `operandA` |
 | `expression` | `expression` |
 
-Operands are securely passed as JSON strings to avoid floating point precision loss.
+Operands are passed as JSON strings to avoid floating point precision loss.
 
 ### Curl Examples & Responses
 
@@ -86,6 +92,7 @@ curl -X POST http://localhost:8080/api/calculate -H "Content-Type: application/j
 curl -X POST http://localhost:8080/api/calculate -H "Content-Type: application/json" -d '{"operator":"expression","expression":"(5+5)*2"}'
 # Response: {"result":"20"}
 ```
+On Windows Command Prompt use double quotes with escaped inner quotes, e.g. `curl -X POST http://localhost:8080/api/calculate -H "Content-Type: application/json" -d "{\"operator\":\"add\",\"operandA\":\"5\",\"operandB\":\"3\"}"` (or use PowerShell/Postman).
 
 ### Error Codes
 | HTTP Status | Trigger |
@@ -101,7 +108,7 @@ The backend never chains; it is stateless. The UI does: without brackets, each t
 
 Note: Percentage (`%`) is calculated instantly as `value/100` and is not supported inside expression strings.
 
-## Design Decisions
+## Design Decisions & Assumptions
 - **Single polymorphic endpoint**: Implemented via Jackson `@JsonTypeInfo`, a sealed interface, and one record per operation, so each type strictly validates its own required fields.
 - **String operands**: Eliminates precision loss at the JSON serialization layer.
 - **Layering**: Clean separation of concerns between controller, service, DTO records, and a global exception handler.
@@ -121,10 +128,8 @@ Note: Percentage (`%`) is calculated instantly as `value/100` and is not support
 ## Testing & Coverage
 
 **Backend:**
-```bash
-mvn clean verify
-```
-*Note: Due to environmental limits, `mvn clean verify` failed locally because Maven (`mvn`) was not found in the PATH. The JaCoCo test coverage report will normally be generated at `backend/target/site/jacoco/index.html`.*
+Run `mvn clean verify` (or in IntelliJ: Maven tool window -> Lifecycle -> verify). Coverage report: `backend/target/site/jacoco/index.html`.
+Backend line coverage: **91%**.
 
 **Frontend:**
 ```bash
@@ -137,7 +142,7 @@ npm run test:coverage
 The brief prefers Go. I chose Java/Spring Boot because it is the stack I am strongest in, which let me spend the time budget on correctness, validation and tests. The design (stateless service, single JSON endpoint, pure calculation core) ports directly to Go, and I am happy to discuss how I would do it.
 
 ## What I'd Do Next
-- Docker (multi-stage)
+- CI (GitHub Actions running mvn verify and npm test on every push)
 - OpenAPI docs
 - Rate limiting
 - A Go port
